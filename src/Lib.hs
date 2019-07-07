@@ -12,12 +12,6 @@ data Suit = Spade
           | Heart
           | Diamond
           deriving (Eq, Ord, Show, Enum)
-
-instance Semigroup Suit where 
-  Spade   <> _ = Spade
-  Club    <> _ = Club
-  Heart   <> _ = Heart 
-  Diamond <> _ = Diamond 
   
 data Rank = Ace
           | Two
@@ -32,13 +26,10 @@ data Rank = Ace
           | Jack
           | Queen
           | King
-          deriving (Eq, Show, Enum, Ord)
+          deriving (Eq, Ord, Show, Enum)
 
 data Card = Card Suit Rank | Bottom
   deriving (Eq, Show)
-
-instance Ord Card where 
-  (Card _ a) <= (Card _ a') = a <= a'
 
 data Cards a = Cards a | NoCards
   deriving (Eq, Show)
@@ -67,6 +58,9 @@ instance Monad Cards where
   (Cards a) >>= f = f a 
   NoCards   >>= f = NoCards
 
+instance Foldable Cards where
+  foldMap f (Cards a) = f a 
+
 data Tableau a = Tableau a
              deriving Show
 
@@ -91,34 +85,36 @@ makeStock =
         ranks = [Ace .. King]
 
 shuffleCard :: (Applicative f, Eq a) => Int -> f [a] -> f [a]
-shuffleCard i d = 
-  (:) <$> c <*> (delete <$> c <*> d)
-  where c = (!! i) <$> d
+shuffleCard i stock = 
+  liftA2 (:) card (liftA2 delete card stock)
+  where card = fmap (!! i) stock
 
 shuffleStock :: (Applicative f, Eq a) => f [a] -> IO (f [a])
-shuffleStock d = 
-  shuffle 1000 d
-  where shuffle 0 d' = return d' 
-        shuffle x d' = do
+shuffleStock stock = 
+  shuffle 1000 stock
+  where shuffle 0 stock' = return stock' 
+        shuffle x stock' = do
           i <- randomRIO (1, 51)
-          (return $ shuffleCard i d') >>= (shuffle $ x - 1)
+          (return $ shuffleCard i stock') >>= (shuffle $ x - 1)
 
-dealTableau :: Cards [a] -> Tableau (Map (Sum Int) (Cards [a]))
+          -- map (foldMap (Sum . length))
+
+dealTableau :: Cards [Card] -> Tableau (Map (Sum Int) (Cards [Card]))
 dealTableau stock =
-  Tableau $ M.fromList $ map (\(Cards x) -> (Sum $ length x, Cards x)) $ deal t
-  where t = replicate 7 $ Cards []
+  Tableau $ M.fromList $ map (\cards -> (foldMap (Sum . length) cards, cards)) $ deal tableau
+  where tableau = replicate 7 $ Cards []
         dealOneCard _ [] = []
-        dealOneCard st (x:xs) = ((take 1 <$> st) <> x) : (dealOneCard (drop 1 <$> st) xs)
+        dealOneCard stock (x:xs) = (addCard stock x) : (dealOneCard (takeCard stock) xs)
         buildTableau _ [] = [] 
-        buildTableau st (x:xs) = x : (buildTableau st' $ dealOneCard st' xs)
-          where st' = drop (length $ x:xs) <$> st
+        buildTableau stock (x:xs) = x : (buildTableau stock' $ dealOneCard stock' xs)
+          where stock' = drop (length $ x:xs) <$> stock
         deal = (buildTableau stock) . (dealOneCard stock)
 
 startGame :: IO Game
 startGame = do 
-  s <- shuffleStock makeStock
-  let tableau     = dealTableau s 
-      stock       = drop 28 <$> s
+  stock' <- shuffleStock makeStock
+  let tableau     = dealTableau stock' 
+      stock       = drop 28 <$> stock'
       talon       = Cards []
       foundations = Foundations $ M.fromList $ flip (,) (Cards []) <$> [Spade .. Diamond]
     in return $ Game tableau stock talon foundations

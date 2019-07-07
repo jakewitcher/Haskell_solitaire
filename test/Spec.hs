@@ -77,10 +77,8 @@ main = hspec $ do
           piles    = map (\x -> snd x) $ M.toList piles' 
           stock    = gameStock game
           allCards = (<> stock) $ foldr (\pile cs -> pile <> cs) (Cards []) piles
-          (Cards result1) = (==) <$> (length <$> allCards) <*> ((length . nub) <$> allCards)
-          (Cards result2) = (==) <$> (length <$> allCards) <*> ((length . nub) <$> allCards)
-      result1 `shouldBe` True 
-      result2 `shouldBe` True
+          (Cards result) = (==) <$> (length <$> allCards) <*> ((length . nub) <$> allCards)
+      result `shouldBe` True 
 
   describe "transfer cards between card stacks" $ do
 
@@ -232,7 +230,6 @@ main = hspec $ do
       p `shouldBe` Cards [Card Diamond King, Card Diamond Eight]
       p' `shouldBe` Cards [Card Club Ace, Card Heart Two, Card Club Three, Card Heart Four, Card Spade Five, Card Diamond Six, Card Spade Seven]
 
-    -- fix test transferCardFromPileToFoundation
     it "should transfer a card from a pile to a foundation" $ do 
       let game = transferCardFromPileToFoundation testGame 6 Diamond
           (Tableau ps)     = gameTableau game 
@@ -242,7 +239,6 @@ main = hspec $ do
       p `shouldBe` Cards [Card Spade King, Card Heart King]
       f `shouldBe` Cards [Card Diamond Ace]
 
-    -- fix test transferCardFromTalonToFoundation
     it "should transfer a card from the talon to a foundation" $ do 
       let game             = transferCardFromTalonToFoundation testGame Spade
           t                = gameTalon game 
