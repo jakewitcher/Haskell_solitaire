@@ -1,5 +1,6 @@
 module Graphics where
 
+import Data.List
 import Lib
 
 cardTop :: String
@@ -12,43 +13,34 @@ cardRankTop' :: String -> String
 cardRankTop' "10" = "|10        |" 
 cardRankTop' str  = "|" ++ str ++ "         |"
 
-cardRankTop :: Rank -> String
-cardRankTop rank =
-  case rank of 
-    Ace   -> cardRankTop' "A"
-    Two   -> cardRankTop' "2"
-    Three -> cardRankTop' "3"
-    Four  -> cardRankTop' "4"
-    Five  -> cardRankTop' "5"
-    Six   -> cardRankTop' "6"
-    Seven -> cardRankTop' "7"
-    Eight -> cardRankTop' "8"
-    Nine  -> cardRankTop' "9"
-    Ten   -> cardRankTop' "10"
-    Jack  -> cardRankTop' "J"
-    Queen -> cardRankTop' "Q"
-    King  -> cardRankTop' "K"
-
 cardRankBottom' :: String -> String
 cardRankBottom' "10" = "|        10|"
 cardRankBottom' rank = "|         " ++ rank ++ "|"
 
+cardRank :: (String -> String) -> Rank -> String
+cardRank f rank =
+  case rank of 
+    Ace   -> f "A"
+    Two   -> f "2"
+    Three -> f "3"
+    Four  -> f "4"
+    Five  -> f "5"
+    Six   -> f "6"
+    Seven -> f "7"
+    Eight -> f "8"
+    Nine  -> f "9"
+    Ten   -> f "10"
+    Jack  -> f "J"
+    Queen -> f "Q"
+    King  -> f "K"
+
+cardRankTop :: Rank -> String
+cardRankTop =
+  cardRank cardRankTop'
+
 cardRankBottom :: Rank -> String
-cardRankBottom rank =
-  case rank of
-    Ace   -> cardRankBottom' "A"
-    Two   -> cardRankBottom' "2"
-    Three -> cardRankBottom' "3"
-    Four  -> cardRankBottom' "4"
-    Five  -> cardRankBottom' "5"
-    Six   -> cardRankBottom' "6"
-    Seven -> cardRankBottom' "7"
-    Eight -> cardRankBottom' "8"
-    Nine  -> cardRankBottom' "9"
-    Ten   -> cardRankBottom' "10"
-    Jack  -> cardRankBottom' "J"
-    Queen -> cardRankBottom' "Q"
-    King  -> cardRankBottom' "K"
+cardRankBottom =
+  cardRank cardRankBottom'
 
 cardEmptySpace :: String
 cardEmptySpace = "|          |"
@@ -133,60 +125,46 @@ cardBackRow3 = "|**({}{})**|"
 cardBackRow4 :: String 
 cardBackRow4 = "|***({})***|"
 
-printSuit :: Suit -> IO ()
-printSuit suit =
+drawSuit :: Suit -> [String]
+drawSuit suit =
   case suit of 
-    Club -> do
-      putStrLn clubTop
-      putStrLn clubBottom
-    Spade -> do 
-      putStrLn spadeTop
-      putStrLn spadeBottom
-    Heart -> do 
-      putStrLn heartTop
-      putStrLn heartBottom
-    Diamond -> do 
-      putStrLn diamondTop
-      putStrLn diamondBottom
+    Club -> [clubTop, clubBottom]
+    Spade -> [spadeTop, spadeBottom]
+    Heart -> [heartTop, heartBottom]
+    Diamond -> [diamondTop, diamondBottom]
 
-printCardMiddle :: Suit -> Rank -> IO ()
-printCardMiddle suit rank =
+drawCardMiddle :: Suit -> Rank -> [String]
+drawCardMiddle suit rank =
   case rank of
-    King -> do
-      putStrLn $ kingCrown suit 
-      putStrLn $ faceCardHead suit 
-      putStrLn faceCardRoyalShoulders
-      putStrLn faceCardWaist
-    Queen -> do 
-      putStrLn $ queenCrown suit 
-      putStrLn $ faceCardHead suit 
-      putStrLn faceCardRoyalShoulders
-      putStrLn faceCardWaist
-    Jack -> do 
-      putStrLn $ jackHat suit 
-      putStrLn $ faceCardHead suit 
-      putStrLn faceCardJackShoulders
-      putStrLn faceCardWaist
-    _ -> do 
-      putStrLn cardEmptySpace
-      printSuit suit
-      putStrLn cardEmptySpace
+    King  -> [kingCrown suit, faceCardHead suit, faceCardRoyalShoulders, faceCardWaist]
+    Queen -> [queenCrown suit, faceCardHead suit, faceCardRoyalShoulders, faceCardWaist]
+    Jack  -> [jackHat suit, faceCardHead suit, faceCardJackShoulders, faceCardWaist]
+    _     -> [cardEmptySpace] ++ (drawSuit suit) ++ [cardEmptySpace]
 
-printCard :: Suit -> Rank -> IO ()
-printCard suit rank = do 
-  putStrLn cardTop
-  putStrLn $ cardRankTop rank
-  printCardMiddle suit rank
-  putStrLn $ cardRankBottom rank
-  putStrLn cardBottom
+drawCard :: Suit -> Rank -> [String]
+drawCard suit rank =
+  [cardTop, cardRankTop rank] ++ (drawCardMiddle suit rank) ++ [cardRankBottom rank, cardBottom]
 
-printCardBack :: IO ()
-printCardBack = do
-  putStrLn cardTop 
-  putStrLn cardBackStars
-  putStrLn cardBackRow1
-  putStrLn cardBackRow2
-  putStrLn cardBackRow3
-  putStrLn cardBackRow4
-  putStrLn cardBackStars
-  putStrLn cardBottom
+drawCardBack :: [String]
+drawCardBack =
+  [cardTop, cardBackStars, cardBackRow1, cardBackRow2, cardBackRow3, cardBackRow4, cardBackStars, cardBottom]
+
+drawCardBackInPile :: [String]
+drawCardBackInPile =
+  [cardTop, cardBackStars]
+
+draw :: Either a Card -> [String]
+draw card =
+  case card of
+    Left _ -> drawCardBackInPile
+    Right (Card suit rank) -> drawCard suit rank
+
+drawPile :: [Either a Card] -> [String]
+drawPile =
+  concatMap draw
+
+drawPiles :: [[Either a Card]] -> IO ()
+drawPiles piles =
+  let x = transpose $ map drawPile piles
+      y = map (intercalate "  ") x
+  in foldMap putStrLn y
