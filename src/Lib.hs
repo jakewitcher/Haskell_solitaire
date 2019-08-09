@@ -28,7 +28,9 @@ data Rank = Ace
           | King
           deriving (Eq, Ord, Show, Enum)
 
-data Card = Card Suit Rank | Bottom
+data Card = FaceUp Suit Rank
+          | FaceDown Suit Rank
+          | Bottom
   deriving (Eq, Show)
 
 data Cards a = Cards a | NoCards
@@ -80,9 +82,22 @@ data Game = Game
 makeStock :: Cards [Card]
 makeStock =
   Cards cards 
-  where cards = Card <$> suits <*> ranks
+  where cards = FaceDown <$> suits <*> ranks
         suits = [Spade .. Diamond]
         ranks = [Ace .. King]
+
+flipCard :: Card -> Card 
+flipCard (FaceDown s r) = FaceUp s r
+flipCard (FaceUp s r) = FaceDown s r
+flipCard Bottom = Bottom
+
+flipFirst' :: [Card] -> [Card]
+flipFirst' [] = []
+flipFirst' (x:xs) = (flipCard x) : xs
+
+flipFirst :: Cards [Card] -> Cards [Card]
+flipFirst cards =
+  fmap flipFirst' cards
 
 shuffleCard :: (Applicative f, Eq a) => Int -> f [a] -> f [a]
 shuffleCard i stock = 
@@ -97,18 +112,29 @@ shuffleStock stock =
           i <- randomRIO (1, 51)
           (return $ shuffleCard i stock') >>= (shuffle $ x - 1)
 
-          -- map (foldMap (Sum . length))
+dealOneCard :: Cards [Card] -> [Cards [Card]] -> [Cards [Card]]
+dealOneCard _ [] = []
+dealOneCard stock (x:xs) = (addCard stock x) : (dealOneCard (takeCard stock) xs)
+
+dealRemaining :: Cards [Card] -> [Cards [Card]] -> [Cards [Card]]
+dealRemaining _ [] = []
+dealRemaining stock (x:xs) = 
+  x : (dealRemaining stock' $ dealOneCard stock' xs)
+  where stock' = drop (length $ x:xs) <$> stock
+
+dealTableau' :: Cards [Card] -> [Cards [Card]] -> [Cards [Card]]
+dealTableau' stock = 
+  (map flipFirst) . ((dealRemaining stock) . (dealOneCard stock))
+
+cardsListToMap :: [Cards [Card]] -> Map (Sum Int) (Cards [Card])
+cardsListToMap =
+  M.fromList . (map go)
+  where go cards = (foldMap (Sum . length) cards, cards)
 
 dealTableau :: Cards [Card] -> Tableau (Map (Sum Int) (Cards [Card]))
 dealTableau stock =
-  Tableau $ M.fromList $ map (\cards -> (foldMap (Sum . length) cards, cards)) $ deal tableau
+  Tableau $ cardsListToMap (dealTableau' stock tableau)
   where tableau = replicate 7 $ Cards []
-        dealOneCard _ [] = []
-        dealOneCard stock (x:xs) = (addCard stock x) : (dealOneCard (takeCard stock) xs)
-        buildTableau _ [] = [] 
-        buildTableau stock (x:xs) = x : (buildTableau stock' $ dealOneCard stock' xs)
-          where stock' = drop (length $ x:xs) <$> stock
-        deal = (buildTableau stock) . (dealOneCard stock)
 
 startGame :: IO Game
 startGame = do 
@@ -132,33 +158,51 @@ isRed suit =
 isBlack :: Suit -> Bool
 isBlack = not . isRed
 
-isSuccessor :: Card -> Card -> Bool 
-isSuccessor (Card _ King) Bottom = True
-isSuccessor (Card _ King) _      = False
-isSuccessor Bottom _             = False
-isSuccessor (Card suit rank) (Card suit' rank') =
-  (succ rank == rank') && (isRed suit == isBlack suit') 
+isSuccessor :: Card -> Card -> Bool
+isSuccessor cardA cardB =
+  case cardA of
+    Bottom -> False
+    FaceDown _ _ -> False 
+    FaceUp suit rank ->
+      case cardB of
+        Bottom -> False
+        FaceDown _ _ -> False
+        FaceUp suit' rank' ->
+          (succ rank == rank') && (isRed suit == isBlack suit')
 
 isPredecessor :: Card -> Card -> Bool
-isPredecessor (Card _ Ace) Bottom = True
-isPredecessor (Card _ Ace) _      = False
-isPredecessor Bottom _            = False
-isPredecessor (Card suit rank) (Card suit' rank') =
-  (pred rank == rank') && (isBlack suit == isBlack suit')
+isPredecessor cardA cardB =
+  case cardA of
+    Bottom -> False
+    FaceDown _ _ -> False 
+    FaceUp suit rank ->
+      case cardB of
+        Bottom -> False
+        FaceDown _ _ -> False
+        FaceUp suit' rank' ->
+          (pred rank == rank') && (isBlack suit == isBlack suit')
 
-takeSequence :: [Card] -> [Card]
-takeSequence (x:[]) = []
-takeSequence (x:x':xs) =
-  if (isSuccessor x x')
-  then x : (takeSequence (x':xs)) 
-  else [x]
+isFaceUp :: Card -> Bool
+isFaceUp card =
+  case card of
+    (FaceUp _ _)   -> True
+    (FaceDown _ _) -> False
+    Bottom         -> False
 
-dropSequence :: [Card] -> [Card]
-dropSequence (x:[]) = []
-dropSequence (x:x':xs) = 
-  if (isSuccessor x x')
-  then (dropSequence (x':xs))
-  else (x':xs)
+isFaceDown :: Card -> Bool
+isFaceDown card =
+  case card of
+    (FaceUp _ _)   -> False
+    (FaceDown _ _) -> True
+    Bottom         -> False
+
+takeFaceUp :: [Card] -> [Card]
+takeFaceUp =
+  filter isFaceUp
+
+dropFaceUp :: [Card] -> [Card]
+dropFaceUp =
+  filter isFaceDown
 
 lastOrEmpty :: [Card] -> Card
 lastOrEmpty [] = Bottom
@@ -185,7 +229,7 @@ maybePredecessor = maybeAdjacent isPredecessor
 
 maybeAdjacentOfSequence :: (Card -> Card -> Bool) -> (Cards [Card], Cards [Card]) -> Maybe (Cards [Card], Cards [Card])
 maybeAdjacentOfSequence f (source, target) =
-  let (Cards a) = (lastOrEmpty <$> (takeSequence <$> source)) 
+  let (Cards a) = (lastOrEmpty <$> (takeFaceUp <$> source)) 
       (Cards b) = (firstOrEmpty <$> target)
   in if (f a b)
      then Just (source, target)
@@ -200,7 +244,7 @@ transferCard (source, target) =
 
 transferCards :: (Cards [Card], Cards [Card]) -> (Cards [Card], Cards [Card])
 transferCards (source, target) =
-  (dropSequence <$> source, (takeSequence <$> source) <> target)
+  (dropFaceUp <$> source, (takeFaceUp <$> source) <> target)
 
 transferCardToSuccessor :: (Cards [Card], Cards [Card]) -> Maybe (Cards [Card], Cards [Card])  
 transferCardToSuccessor = 
@@ -222,50 +266,58 @@ selectCards key cardPiles =
 
 transferCardFromStockToTalon :: Game -> Game
 transferCardFromStockToTalon game =
-  let (a, b) = transferCard (gameStock game, gameTalon game)
-  in game { gameStock = a, gameTalon = b }
+  let (updatedStock, updatedTalon) = transferCard (gameStock game, gameTalon game)
+  in game { gameStock = updatedStock, gameTalon = flipFirst updatedTalon }
 
 transferCardFromTalonToPile :: Game -> Sum Int -> Game 
-transferCardFromTalonToPile game k =
+transferCardFromTalonToPile game key =
   case result of
     Nothing     -> game 
-    Just (a, b) -> 
-      let p = M.insert k b p'
-      in game { gameTalon = a, gameTableau = Tableau p }
-  where (Tableau p') = gameTableau game
-        result       = transferCardToSuccessor (gameTalon game, selectCards k p')
+    Just (updatedTalon, updatedPile) -> 
+      let piles = M.insert key updatedPile piles'
+      in game { gameTalon = updatedTalon, gameTableau = Tableau piles }
+  where (Tableau piles') = gameTableau game
+        result          = transferCardToSuccessor (gameTalon game, selectCards key piles')
         
-
+-- the card (if not Bottom) needs to be flipped when card or cards are moved from one pile to another
 transferCardsFromPileToPile :: Game -> Sum Int -> Sum Int -> Game 
-transferCardsFromPileToPile game k k' =
+transferCardsFromPileToPile game key key' =
   case result of 
     Nothing     -> game
-    Just (a, b) -> 
-      let piles = (M.insert k' b) . (M.insert k a) $ piles'
+    Just (updatedFromPile, updatedToPile) -> 
+      let piles = (M.insert key' updatedToPile) . (M.insert key $ flipFirst updatedFromPile) $ piles'
       in game { gameTableau = Tableau piles }
   where (Tableau piles') = gameTableau game 
-        result           = transferSequenceToSuccessor (selectCards k piles', selectCards k' piles')
+        result           = transferSequenceToSuccessor (selectCards key piles', selectCards key' piles')
 
 transferCardFromPileToFoundation :: Game -> Sum Int -> Suit -> Game
-transferCardFromPileToFoundation game k k' =
+transferCardFromPileToFoundation game key key' =
   case result of 
     Nothing     -> game 
-    Just (a, b) ->
-      let piles       = M.insert k a piles'
-          foundations = M.insert k' b foundations'
+    Just (updatedPile, updatedFoundation) ->
+      let piles       = M.insert key updatedPile piles'
+          foundations = M.insert key' updatedFoundation foundations'
       in game { gameTableau     = Tableau  piles
               , gameFoundations = Foundations foundations }
   where (Tableau piles')           = gameTableau game 
         (Foundations foundations') = gameFoundations game
-        result                     = transferCardToPredecessor (selectCards k piles', selectCards k' foundations') 
+        result                     = transferCardToPredecessor (selectCards key piles', selectCards key' foundations') 
         
 transferCardFromTalonToFoundation :: Game -> Suit -> Game
-transferCardFromTalonToFoundation game k =
+transferCardFromTalonToFoundation game key =
   case result of 
     Nothing     -> game 
-    Just (a, b) ->
-      let f = M.insert k b f'
-      in game { gameTalon       = a
+    Just (updatedTalon, updatedFoundation) ->
+      let f = M.insert key updatedFoundation f'
+      in game { gameTalon       = updatedTalon
               , gameFoundations = Foundations f }
   where (Foundations f') = gameFoundations game 
-        result           = transferCardToPredecessor (gameTalon game, selectCards k f')
+        result           = transferCardToPredecessor (gameTalon game, selectCards key f')
+
+returnTalonToStock :: Game -> Game
+returnTalonToStock game =
+  game { gameTalon = Cards []
+       , gameStock = (map flipCard) . reverse <$> talon' }
+  where talon' = gameTalon game
+        
+

@@ -6,30 +6,30 @@ import           Data.Monoid
 import           Lib
 import           Test.Hspec
 
-deck  = Card <$> [Spade .. Diamond] <*> [Ace .. King]
+deck  = FaceDown <$> [Spade .. Diamond] <*> [Ace .. King]
 pileA = Cards . (take 10) $ deck
 pileB = Cards . (take 10) . reverse $ deck
 
-pile1 = Cards [Card Club Ace, Card Heart Two, Card Club Three, Card Diamond King, Card Diamond Eight]
-pile2 = Cards [Card Spade Jack, Card Spade Nine, Card Diamond Queen, Card Heart Three]
-pile3 = Cards [Card Spade Eight, Card Club Two, Card Club Jack]
+pile1 = Cards [FaceUp Club Ace, FaceUp Heart Two, FaceUp Club Three, FaceDown Diamond King, FaceDown Diamond Eight]
+pile2 = Cards [FaceUp Spade Jack, FaceDown Spade Nine, FaceDown Diamond Queen, FaceDown Heart Three]
+pile3 = Cards [FaceUp Spade Eight, FaceDown Club Two, FaceDown Club Jack]
 pile4 = Cards []
-pile5 = Cards [Card Heart Four, Card Spade Five, Card Diamond Six, Card Spade Seven]
-pile6 = Cards [Card Diamond Ace, Card Spade King, Card Heart King]
-pile7 = Cards [Card Diamond Two, Card Club King, Card Heart Ace, Card Diamond Ten]
+pile5 = Cards [FaceUp Heart Four, FaceUp Spade Five, FaceUp Diamond Six, FaceUp Spade Seven]
+pile6 = Cards [FaceUp Diamond Ace, FaceDown Spade King, FaceDown Heart King]
+pile7 = Cards [FaceUp Diamond Two, FaceDown Club King, FaceDown Heart Ace, FaceDown Diamond Ten]
 
 foundation1 = Cards []
-foundation2 = Cards [Card Spade Two, Card Spade Ace]
+foundation2 = Cards [FaceUp Spade Two, FaceUp Spade Ace]
 foundation3 = Cards []
 foundation4 = Cards []
 
-testStock = Cards [ Card Club Four, Card Diamond Five, Card Spade Two, Card Club Six, Card Club Seven, Card Club Nine
-                  , Card Club Queen, Card Spade Four, Card Spade Six, Card Spade Ten, Card Spade Queen, Card Diamond Four, Card Heart Five
-                  , Card Club Eight, Card Diamond Nine, Card Heart Seven, Card Heart Eight, Card Heart Ten, Card Heart Jack, Card Heart Queen
-                  , Card Diamond Three, Card Diamond Seven, Card Club Five, Card Diamond Jack, Card Heart Nine
+testStock = Cards [ FaceDown Club Four, FaceDown Diamond Five, FaceDown Spade Two, FaceDown Club Six, FaceDown Club Seven, FaceDown Club Nine
+                  , FaceDown Club Queen, FaceDown Spade Four, FaceDown Spade Six, FaceDown Spade Ten, FaceDown Spade Queen, FaceDown Diamond Four, FaceDown Heart Five
+                  , FaceDown Club Eight, FaceDown Diamond Nine, FaceDown Heart Seven, FaceDown Heart Eight, FaceDown Heart Ten, FaceDown Heart Jack, FaceDown Heart Queen
+                  , FaceDown Diamond Three, FaceDown Diamond Seven, FaceDown Club Five, FaceDown Diamond Jack, FaceDown Heart Nine
                   ]
 
-testTalon = Cards [Card Spade Three, Card Heart Six, Card Club Ten]
+testTalon = Cards [FaceUp Spade Three, FaceUp Heart Six, FaceUp Club Ten]
 
 testTableau = Tableau $ M.fromList [(Sum 1, pile1), (Sum 2, pile2), (Sum 3, pile3), (Sum 4, pile4), (Sum 5, pile5), (Sum 6, pile6), (Sum 7, pile7)]
 testFoundations = Foundations $ M.fromList [(Club, foundation1), (Spade, foundation2), (Heart, foundation3), (Diamond, foundation4)]
@@ -91,10 +91,10 @@ main = hspec $ do
       length result `shouldBe` 11
 
     it "should determine if a card is a different color and the successor of another card" $ do 
-      let cardA = (Card Club Queen)
-          cardB = (Card Heart King)
-          cardC = (Card Club King) 
-          cardD = (Card Heart Jack) 
+      let cardA = (FaceUp Club Queen)
+          cardB = (FaceUp Heart King)
+          cardC = (FaceUp Club King) 
+          cardD = (FaceUp Heart Jack) 
           result1 = isSuccessor cardA cardB
           result2 = isSuccessor cardA cardC 
           result3 = isSuccessor cardA cardD
@@ -107,10 +107,10 @@ main = hspec $ do
       result5 `shouldBe` False
 
     it "should determine if a card is the same color and the predecessor of another card" $ do 
-      let cardA = (Card Club Two)
-          cardB = (Card Club Ace)
-          cardC = (Card Heart Ace)
-          cardD = (Card Club Three) 
+      let cardA = (FaceUp Club Two)
+          cardB = (FaceUp Club Ace)
+          cardC = (FaceUp Heart Ace)
+          cardD = (FaceUp Club Three) 
           result1 = isPredecessor cardA cardB
           result2 = isPredecessor cardA cardC 
           result3 = isPredecessor cardA cardD
@@ -122,36 +122,36 @@ main = hspec $ do
       result4 `shouldBe` True 
       result5 `shouldBe` False
 
-    it "should only take cards from a list if they are sequential" $ do 
-      let cards  = [Card Club Ace, Card Heart Two, Card Spade Three, Card Diamond Four, Card Club Five, Card Club Six]
-          result = takeSequence cards
-          go  = filter (== (Card Club Six)) result
+    it "should only take cards from a list if they are Face Up" $ do 
+      let cards  = [FaceUp Club Ace, FaceUp Heart Two, FaceUp Spade Three, FaceUp Diamond Four, FaceUp Club Five, FaceDown Club Six]
+          result = takeFaceUp cards
+          go  = filter (== (FaceDown Club Six)) result
       length result `shouldBe` 5
       length go `shouldBe` 0
 
-    it "should drop cards from a list if they are sequential" $ do 
-      let cards  = [Card Club Ace, Card Heart Two, Card Spade Three, Card Diamond Four, Card Heart Five, Card Club Six]
-          result = dropSequence cards
-          go = filter (\x -> x /= (Card Club Six) && x /= (Card Heart Five)) result
+    it "should drop cards from a list if they are Face Up" $ do 
+      let cards  = [FaceUp Club Ace, FaceUp Heart Two, FaceUp Spade Three, FaceUp Diamond Four, FaceDown Heart Five, FaceDown Club Six]
+          result = dropFaceUp cards
+          go = filter (\x -> x /= (FaceDown Club Six) && x /= (FaceDown Heart Five)) result
       length result `shouldBe` 2
       length go `shouldBe` 0
 
     it "should retrieve the last item in a list if there is one" $ do 
-      let result1 = lastOrEmpty [Card Diamond Six, Card Diamond Seven, Card Diamond Eight]
+      let result1 = lastOrEmpty [FaceUp Diamond Six, FaceDown Diamond Seven, FaceDown Diamond Eight]
           result2 = lastOrEmpty []
-      result1 `shouldBe` (Card Diamond Eight)
+      result1 `shouldBe` (FaceDown Diamond Eight)
       result2 `shouldBe` Bottom
 
     it "should retrieve the first item in a list if there is one" $ do 
-      let result1 = firstOrEmpty [Card Spade Jack, Card Spade Queen, Card Spade King]
+      let result1 = firstOrEmpty [FaceUp Spade Jack, FaceDown Spade Queen, FaceDown Spade King]
           result2 = firstOrEmpty []
-      result1 `shouldBe` (Card Spade Jack)
+      result1 `shouldBe` (FaceUp Spade Jack)
       result2 `shouldBe` Bottom
 
     it "should determine if the first card in list B is the successor of the first card in list A" $ do
-      let x = (Cards [Card Spade Ace], Cards [Card Heart Two])
-          y = (Cards [Card Spade Ace], Cards [Card Spade Two])
-          z = (Cards [Card Spade Ace], Cards [Card Heart Three])
+      let x = (Cards [FaceUp Spade Ace], Cards [FaceUp Heart Two])
+          y = (Cards [FaceUp Spade Ace], Cards [FaceUp Spade Two])
+          z = (Cards [FaceUp Spade Ace], Cards [FaceUp Heart Three])
           result1 = maybeSuccessor x
           result2 = maybeSuccessor y
           result3 = maybeSuccessor z
@@ -160,9 +160,9 @@ main = hspec $ do
       result3 `shouldBe` Nothing
 
     it "should determine if the first card in list B is the predecessor of the first card in list A" $ do 
-      let x = (Cards [Card Spade Two], Cards [Card Spade Ace])
-          y = (Cards [Card Heart Two], Cards [Card Spade Ace])
-          z = (Cards [Card Spade Ace], Cards [Card Spade Two])
+      let x = (Cards [FaceUp Spade Two], Cards [FaceUp Spade Ace])
+          y = (Cards [FaceUp Heart Two], Cards [FaceUp Spade Ace])
+          z = (Cards [FaceUp Spade Ace], Cards [FaceUp Spade Two])
           result1 = maybePredecessor x
           result2 = maybePredecessor y
           result3 = maybePredecessor z
@@ -171,8 +171,8 @@ main = hspec $ do
       result2 `shouldBe` Nothing
 
     it "should determine if the first card in list B is the successor of the last item in sequence A" $ do 
-      let x = (Cards [Card Diamond Two, Card Club Three, Card Heart Four, Card Heart King], Cards [Card Spade Five])
-          y = (Cards [Card Diamond Two, Card Club Three, Card Heart Four, Card Heart King], Cards [Card Heart Five])
+      let x = (Cards [FaceUp Diamond Two, FaceUp Club Three, FaceUp Heart Four, FaceDown Heart King], Cards [FaceUp Spade Five])
+          y = (Cards [FaceUp Diamond Two, FaceUp Club Three, FaceUp Heart Four, FaceDown Heart King], Cards [FaceUp Heart Five])
           result1 = maybeSuccessorOfSequence x
           result2 = maybeSuccessorOfSequence y
       result1 `shouldBe` (Just x)
@@ -184,20 +184,20 @@ main = hspec $ do
       length b `shouldBe` 11
 
     it "should transfer card A from one pile to another if card B is the successor" $ do
-      let x = (Cards [Card Spade Ace], Cards [Card Heart Two])
-          y = (Cards [], Cards [Card Spade Ace, Card Heart Two])
+      let x = (Cards [FaceUp Spade Ace], Cards [FaceUp Heart Two])
+          y = (Cards [], Cards [FaceUp Spade Ace, FaceUp Heart Two])
           result = transferCardToSuccessor x 
       result `shouldBe` (Just y)
 
     it "should transfer card A from one pile to another if card B is the predecessor" $ do
-      let x = (Cards [Card Spade Two], Cards [Card Spade Ace])
-          y = (Cards [], Cards [Card Spade Two, Card Spade Ace])
+      let x = (Cards [FaceUp Spade Two], Cards [FaceUp Spade Ace])
+          y = (Cards [], Cards [FaceUp Spade Two, FaceUp Spade Ace])
           result = transferCardToPredecessor x
       result `shouldBe` (Just y)
 
     it "should transfer cards if the first card in list B is the successor of the last item in sequence A" $ do 
-      let x = (Cards [Card Diamond Two, Card Club Three, Card Heart Four, Card Heart King], Cards [Card Spade Five])
-          y = (Cards [Card Heart King], Cards [Card Diamond Two, Card Club Three, Card Heart Four, Card Spade Five])
+      let x = (Cards [FaceUp Diamond Two, FaceUp Club Three, FaceUp Heart Four, FaceDown Heart King], Cards [FaceUp Spade Five])
+          y = (Cards [FaceUp Heart King], Cards [FaceUp Diamond Two, FaceUp Club Three, FaceUp Heart Four, FaceUp Spade Five])
           result = transferSequenceToSuccessor x
       result `shouldBe` (Just y)
 
@@ -219,16 +219,16 @@ main = hspec $ do
           t            = gameTalon game 
           (Tableau ps) = gameTableau game
           p            = selectCards 5 ps
-      t `shouldBe` Cards [Card Heart Six, Card Club Ten]
-      p `shouldBe` Cards [Card Spade Three, Card Heart Four, Card Spade Five, Card Diamond Six, Card Spade Seven]
+      t `shouldBe` Cards [FaceUp Heart Six, FaceDown Club Ten]
+      p `shouldBe` Cards [FaceUp Spade Three, FaceUp Heart Four, FaceUp Spade Five, FaceUp Diamond Six, FaceUp Spade Seven]
 
     it "should transfer cards from one pile to another" $ do 
       let game         = transferCardsFromPileToPile testGame 1 5
           (Tableau ps) = gameTableau game 
           p            = selectCards 1 ps 
           p'           = selectCards 5 ps 
-      p `shouldBe` Cards [Card Diamond King, Card Diamond Eight]
-      p' `shouldBe` Cards [Card Club Ace, Card Heart Two, Card Club Three, Card Heart Four, Card Spade Five, Card Diamond Six, Card Spade Seven]
+      p `shouldBe` Cards [FaceUp Diamond King, FaceDown Diamond Eight]
+      p' `shouldBe` Cards [FaceUp Club Ace, FaceUp Heart Two, FaceUp Club Three, FaceUp Heart Four, FaceUp Spade Five, FaceUp Diamond Six, FaceUp Spade Seven]
 
     it "should transfer a card from a pile to a foundation" $ do 
       let game = transferCardFromPileToFoundation testGame 6 Diamond
@@ -236,15 +236,15 @@ main = hspec $ do
           p                = selectCards 6 ps 
           (Foundations fs) = gameFoundations game
           (Just f) = M.lookup Diamond fs
-      p `shouldBe` Cards [Card Spade King, Card Heart King]
-      f `shouldBe` Cards [Card Diamond Ace]
+      p `shouldBe` Cards [FaceUp Spade King, FaceDown Heart King]
+      f `shouldBe` Cards [FaceUp Diamond Ace]
 
     it "should transfer a card from the talon to a foundation" $ do 
       let game             = transferCardFromTalonToFoundation testGame Spade
           t                = gameTalon game 
           (Foundations fs) = gameFoundations game 
           Just f           = M.lookup Spade fs
-      t `shouldBe` Cards [Card Heart Six, Card Club Ten]
-      f `shouldBe` Cards [Card Spade Three, Card Spade Two, Card Spade Ace]
+      t `shouldBe` Cards [FaceUp Heart Six, FaceUp Club Ten]
+      f `shouldBe` Cards [FaceUp Spade Three, FaceUp Spade Two, FaceUp Spade Ace]
 
     

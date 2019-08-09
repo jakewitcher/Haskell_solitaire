@@ -125,6 +125,9 @@ cardBackRow3 = "|**({}{})**|"
 cardBackRow4 :: String 
 cardBackRow4 = "|***({})***|"
 
+emptySpace :: String 
+emptySpace = "            "
+
 drawSuit :: Suit -> [String]
 drawSuit suit =
   case suit of 
@@ -141,30 +144,58 @@ drawCardMiddle suit rank =
     Jack  -> [jackHat suit, faceCardHead suit, faceCardJackShoulders, faceCardWaist]
     _     -> [cardEmptySpace] ++ (drawSuit suit) ++ [cardEmptySpace]
 
-drawCard :: Suit -> Rank -> [String]
-drawCard suit rank =
+drawCardFace :: Suit -> Rank -> [String]
+drawCardFace suit rank =
   [cardTop, cardRankTop rank] ++ (drawCardMiddle suit rank) ++ [cardRankBottom rank, cardBottom]
 
 drawCardBack :: [String]
 drawCardBack =
   [cardTop, cardBackStars, cardBackRow1, cardBackRow2, cardBackRow3, cardBackRow4, cardBackStars, cardBottom]
 
+drawEmpty :: [String]
+drawEmpty =
+  [cardTop, cardEmptySpace, cardEmptySpace, cardEmptySpace, cardEmptySpace, cardEmptySpace, cardEmptySpace, cardBottom]
+
+drawCardFaceInPile :: Rank -> [String]
+drawCardFaceInPile rank =
+  [cardTop, cardRankTop rank]
+
 drawCardBackInPile :: [String]
 drawCardBackInPile =
   [cardTop, cardBackStars]
 
-draw :: Either a Card -> [String]
-draw card =
+drawFrontCard :: Card -> [String]
+drawFrontCard (FaceUp suit rank) =
+  drawCardFace suit rank
+
+drawRemaining :: Card -> [String]
+drawRemaining card =
   case card of
-    Left _ -> drawCardBackInPile
-    Right (Card suit rank) -> drawCard suit rank
+    FaceDown _ _  -> drawCardBackInPile
+    FaceUp _ rank -> drawCardFaceInPile rank
+    Bottom        -> drawEmpty
 
-drawPile :: [Either a Card] -> [String]
-drawPile =
-  concatMap draw
+-- TODO: Using init and last with checking if the list is empty will crash program
+drawPile :: [Card] -> [String]
+drawPile cards =
+  (concatMap drawRemaining $ init cards) ++ (drawFrontCard $ last cards)
 
-drawPiles :: [[Either a Card]] -> IO ()
+drawPiles :: [[Card]] -> IO ()
 drawPiles piles =
-  let x = transpose $ map drawPile piles
+  let x = transpose $ matchMaxLength $ map (drawPile . reverse) piles
       y = map (intercalate "  ") x
   in foldMap putStrLn y
+
+matchMaxLength :: [[String]] -> [[String]]
+matchMaxLength cards =
+  map (addLength maxLength) cards
+  where maxLength = foldr max 0 $ map length cards
+
+addLength :: Int -> [String] -> [String]
+addLength expected cards
+  | length cards == expected = cards
+  | otherwise = addLength expected (addEmptySpace cards)
+
+addEmptySpace :: [String] -> [String]
+addEmptySpace cards =
+  cards ++ [emptySpace]
