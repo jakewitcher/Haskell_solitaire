@@ -142,11 +142,11 @@ drawCardMiddle suit rank =
     King  -> [kingCrown suit, faceCardHead suit, faceCardRoyalShoulders, faceCardWaist]
     Queen -> [queenCrown suit, faceCardHead suit, faceCardRoyalShoulders, faceCardWaist]
     Jack  -> [jackHat suit, faceCardHead suit, faceCardJackShoulders, faceCardWaist]
-    _     -> [cardEmptySpace] ++ (drawSuit suit) ++ [cardEmptySpace]
+    _     -> [cardEmptySpace] ++ drawSuit suit ++ [cardEmptySpace]
 
 drawCardFace :: Suit -> Rank -> [String]
 drawCardFace suit rank =
-  [cardTop, cardRankTop rank] ++ (drawCardMiddle suit rank) ++ [cardRankBottom rank, cardBottom]
+  [cardTop, cardRankTop rank] ++ drawCardMiddle suit rank ++ [cardRankBottom rank, cardBottom]
 
 drawCardBack :: [String]
 drawCardBack =
@@ -178,7 +178,7 @@ drawRemaining card =
 -- TODO: Using init and last with checking if the list is empty will crash program
 drawPile :: [Card] -> [String]
 drawPile cards =
-  (concatMap drawRemaining $ init cards) ++ (drawFrontCard $ last cards)
+  concatMap drawRemaining (init cards) ++ drawFrontCard (last cards)
 
 drawPiles :: [[Card]] -> IO ()
 drawPiles piles =
@@ -189,7 +189,7 @@ drawPiles piles =
 matchMaxLength :: [[String]] -> [[String]]
 matchMaxLength cards =
   map (addLength maxLength) cards
-  where maxLength = foldr max 0 $ map length cards
+  where maxLength = foldr (max . length) 0 cards
 
 addLength :: Int -> [String] -> [String]
 addLength expected cards

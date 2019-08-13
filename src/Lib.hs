@@ -1,9 +1,12 @@
+{-# LANGUAGE TupleSections #-}
+
 module Lib where
 
 import           Control.Applicative
 import           Data.List
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Maybe
 import           Data.Monoid
 import           System.Random (randomRIO)
 
@@ -52,8 +55,8 @@ instance Functor Cards where
 instance Applicative Cards where 
   pure = Cards 
   (Cards f) <*> (Cards a) = Cards $ f a
-  (Cards f) <*> (NoCards) = NoCards
-  (NoCards) <*> (Cards a) = NoCards 
+  (Cards f) <*> NoCards = NoCards
+  NoCards <*> (Cards a) = NoCards 
 
 instance Monad Cards where 
   return = pure 
@@ -63,14 +66,12 @@ instance Monad Cards where
 instance Foldable Cards where
   foldMap f (Cards a) = f a 
 
-data Tableau a = Tableau a
-             deriving Show
+newtype Tableau a = Tableau a deriving Show
 
 instance Functor Tableau where
   fmap f (Tableau a) = Tableau $ f a 
 
-data Foundations = Foundations (Map Suit (Cards [Card]))
-                 deriving Show
+newtype Foundations = Foundations (Map Suit (Cards [Card])) deriving Show
 
 data Game = Game 
   { gameTableau :: Tableau (Map (Sum Int) (Cards [Card]))
@@ -93,11 +94,10 @@ flipCard Bottom = Bottom
 
 flipFirst' :: [Card] -> [Card]
 flipFirst' [] = []
-flipFirst' (x:xs) = (flipCard x) : xs
+flipFirst' (x:xs) = flipCard x : xs
 
 flipFirst :: Cards [Card] -> Cards [Card]
-flipFirst cards =
-  fmap flipFirst' cards
+flipFirst = fmap flipFirst'
 
 shuffleCard :: (Applicative f, Eq a) => Int -> f [a] -> f [a]
 shuffleCard i stock = 
@@ -105,30 +105,29 @@ shuffleCard i stock =
   where card = fmap (!! i) stock
 
 shuffleStock :: (Applicative f, Eq a) => f [a] -> IO (f [a])
-shuffleStock stock = 
-  shuffle 1000 stock
+shuffleStock = shuffle 1000
   where shuffle 0 stock' = return stock' 
         shuffle x stock' = do
           i <- randomRIO (1, 51)
-          (return $ shuffleCard i stock') >>= (shuffle $ x - 1)
+          shuffle (x - 1) (shuffleCard i stock')
 
 dealOneCard :: Cards [Card] -> [Cards [Card]] -> [Cards [Card]]
 dealOneCard _ [] = []
-dealOneCard stock (x:xs) = (addCard stock x) : (dealOneCard (takeCard stock) xs)
+dealOneCard stock (x:xs) = addCard stock x : dealOneCard (takeCard stock) xs
 
 dealRemaining :: Cards [Card] -> [Cards [Card]] -> [Cards [Card]]
 dealRemaining _ [] = []
 dealRemaining stock (x:xs) = 
-  x : (dealRemaining stock' $ dealOneCard stock' xs)
+  x : dealRemaining stock' (dealOneCard stock' xs)
   where stock' = drop (length $ x:xs) <$> stock
 
 dealTableau' :: Cards [Card] -> [Cards [Card]] -> [Cards [Card]]
 dealTableau' stock = 
-  (map flipFirst) . ((dealRemaining stock) . (dealOneCard stock))
+  map flipFirst . (dealRemaining stock . dealOneCard stock)
 
 cardsListToMap :: [Cards [Card]] -> Map (Sum Int) (Cards [Card])
 cardsListToMap =
-  M.fromList . (map go)
+  M.fromList . map go
   where go cards = (foldMap (Sum . length) cards, cards)
 
 dealTableau :: Cards [Card] -> Tableau (Map (Sum Int) (Cards [Card]))
@@ -142,7 +141,7 @@ startGame = do
   let tableau     = dealTableau stock' 
       stock       = drop 28 <$> stock'
       talon       = Cards []
-      foundations = Foundations $ M.fromList $ flip (,) (Cards []) <$> [Spade .. Diamond]
+      foundations = Foundations $ M.fromList $ (, Cards []) <$> [Spade .. Diamond]
     in return $ Game tableau stock talon foundations
 
 takeCard :: Cards [Card] -> Cards [Card]
@@ -206,7 +205,7 @@ dropFaceUp =
 
 lastOrEmpty :: [Card] -> Card
 lastOrEmpty [] = Bottom
-lastOrEmpty (x:[]) = x
+lastOrEmpty [x] = x
 lastOrEmpty (x:xs) = lastOrEmpty xs
 
 firstOrEmpty :: [Card] -> Card
@@ -217,9 +216,7 @@ maybeAdjacent :: (Card -> Card -> Bool) -> (Cards [Card], Cards [Card]) -> Maybe
 maybeAdjacent f (source, target) =
   let (Cards a) = firstOrEmpty <$> source 
       (Cards b) = firstOrEmpty <$> target 
-  in if (f a b)
-     then Just (source, target)
-     else Nothing
+  in if f a b then Just (source, target) else Nothing
 
 maybeSuccessor :: (Cards [Card], Cards [Card]) -> Maybe (Cards [Card], Cards [Card])
 maybeSuccessor = maybeAdjacent isSuccessor
@@ -231,9 +228,7 @@ maybeAdjacentOfSequence :: (Card -> Card -> Bool) -> (Cards [Card], Cards [Card]
 maybeAdjacentOfSequence f (source, target) =
   let (Cards a) = (lastOrEmpty <$> (takeFaceUp <$> source)) 
       (Cards b) = (firstOrEmpty <$> target)
-  in if (f a b)
-     then Just (source, target)
-     else Nothing
+  in if f a b then Just (source, target) else Nothing
 
 maybeSuccessorOfSequence :: (Cards [Card], Cards [Card]) -> Maybe (Cards [Card], Cards [Card])
 maybeSuccessorOfSequence = maybeAdjacentOfSequence isSuccessor
@@ -248,21 +243,19 @@ transferCards (source, target) =
 
 transferCardToSuccessor :: (Cards [Card], Cards [Card]) -> Maybe (Cards [Card], Cards [Card])  
 transferCardToSuccessor = 
-  (fmap transferCard) . maybeSuccessor
+  fmap transferCard . maybeSuccessor
 
 transferCardToPredecessor :: (Cards [Card], Cards [Card]) -> Maybe (Cards [Card], Cards [Card])  
 transferCardToPredecessor = 
-  (fmap transferCard) . maybePredecessor
+  fmap transferCard . maybePredecessor
 
 transferSequenceToSuccessor :: (Cards [Card], Cards [Card]) -> Maybe (Cards [Card], Cards [Card])
 transferSequenceToSuccessor =
-  (fmap transferCards) . maybeSuccessorOfSequence
+  fmap transferCards . maybeSuccessorOfSequence
 
 selectCards :: (Ord k, Monoid a) => k -> Map k a -> a
 selectCards key cardPiles =
-  case (M.lookup key cardPiles) of
-    Just pile -> pile 
-    Nothing   -> mempty
+  fromMaybe mempty (M.lookup key cardPiles)
 
 transferCardFromStockToTalon :: Game -> Game
 transferCardFromStockToTalon game =
@@ -279,13 +272,12 @@ transferCardFromTalonToPile game key =
   where (Tableau piles') = gameTableau game
         result          = transferCardToSuccessor (gameTalon game, selectCards key piles')
         
--- the card (if not Bottom) needs to be flipped when card or cards are moved from one pile to another
 transferCardsFromPileToPile :: Game -> Sum Int -> Sum Int -> Game 
 transferCardsFromPileToPile game key key' =
   case result of 
     Nothing     -> game
     Just (updatedFromPile, updatedToPile) -> 
-      let piles = (M.insert key' updatedToPile) . (M.insert key $ flipFirst updatedFromPile) $ piles'
+      let piles = M.insert key' updatedToPile . M.insert key (flipFirst updatedFromPile) $ piles'
       in game { gameTableau = Tableau piles }
   where (Tableau piles') = gameTableau game 
         result           = transferSequenceToSuccessor (selectCards key piles', selectCards key' piles')
@@ -317,7 +309,5 @@ transferCardFromTalonToFoundation game key =
 returnTalonToStock :: Game -> Game
 returnTalonToStock game =
   game { gameTalon = Cards []
-       , gameStock = (map flipCard) . reverse <$> talon' }
+       , gameStock = map flipCard . reverse <$> talon' }
   where talon' = gameTalon game
-        
-

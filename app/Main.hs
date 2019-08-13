@@ -13,6 +13,5 @@ piles = [ [FaceUp Diamond Queen, FaceUp Diamond King, FaceDown Club Ace]
         ]
 
 main :: IO ()
-main = do
-  drawPiles piles
+main = drawPiles piles
   
